@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAAB · Validador de Invoices</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --navy-950: #050d1a;
+    --navy-900: #0a1628;
+    --navy-800: #0f2040;
+    --navy-700: #162d58;
+    --navy-600: #1e3f7a;
+    --navy-500: #2756a8;
+    --accent:   #c9a84c;
+    --accent-light: #e8c97a;
+    --glass-bg: rgba(255,255,255,0.04);
+    --glass-border: rgba(255,255,255,0.09);
+    --text-primary: #e8edf5;
+    --text-secondary: #8fa4c4;
+    --text-muted: #4d6a96;
+    --ok: #22c55e;
+    --err: #f87171;
+    --warn: #fbbf24;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--navy-950);
+    color: var(--text-primary);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(39,86,168,0.18) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 85% 80%, rgba(201,168,76,0.06) 0%, transparent 50%);
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 28px 40px 24px;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(10,22,40,0.6);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo-mark {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, var(--navy-600), var(--navy-500));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(201,168,76,0.3);
+    flex-shrink: 0;
+  }
+  .logo-mark svg { width: 22px; height: 22px; }
+  .header-text h1 {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text-primary);
+  }
+  .header-text p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .header-badge {
+    margin-left: auto;
+    background: rgba(201,168,76,0.12);
+    border: 1px solid rgba(201,168,76,0.25);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── MAIN ── */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin-bottom: 20px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: rgba(255,255,255,0.14); }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  /* ── UPLOAD ZONES ── */
+  .upload-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 680px) { .upload-grid { grid-template-columns: 1fr; } }
+
+  .drop-zone {
+    border: 2px dashed var(--glass-border);
+    border-radius: var(--radius);
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(255,255,255,0.02);
+    position: relative;
+    min-height: 140px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--navy-500);
+    background: rgba(39,86,168,0.08);
+  }
+  .drop-zone.has-file {
+    border-color: rgba(34,197,94,0.4);
+    background: rgba(34,197,94,0.04);
+  }
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-icon {
+    width: 40px; height: 40px;
+    background: rgba(39,86,168,0.15);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(39,86,168,0.3);
+  }
+  .drop-icon svg { width: 18px; height: 18px; opacity: 0.8; }
+  .drop-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .drop-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .drop-filename {
+    font-size: 12px;
+    color: var(--ok);
+    font-weight: 500;
+    margin-top: 4px;
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── MULTI-FILE TAG LIST ── */
+  .file-tags {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+    justify-content: center;
+  }
+  .file-tag {
+    background: rgba(39,86,168,0.2);
+    border: 1px solid rgba(39,86,168,0.35);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .file-tag .remove-tag {
+    cursor: pointer; color: var(--err); font-size: 13px; line-height: 1;
+    background: none; border: none; padding: 0; opacity: 0.7;
+  }
+  .file-tag .remove-tag:hover { opacity: 1; }
+
+  /* ── BTN ── */
+  .btn-run {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--navy-600) 0%, var(--navy-500) 100%);
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-run::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(201,168,76,0.15), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .btn-run:hover:not(:disabled)::before { opacity: 1; }
+  .btn-run:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(39,86,168,0.35); }
+  .btn-run:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-run:active:not(:disabled) { transform: translateY(0); }
+
+  /* ── LOG ── */
+  .log-panel {
+    background: rgba(5,13,26,0.8);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm);
+    padding: 16px 20px;
+    font-family: 'Cascadia Code', 'Consolas', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #5a7a9e;
+    min-height: 80px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 16px;
+  }
+  .log-panel .log-ok  { color: var(--ok); }
+  .log-panel .log-err { color: var(--err); }
+  .log-panel .log-info { color: var(--accent); }
+  .log-panel .log-line { color: var(--text-secondary); }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .stat-pill {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 30px;
+    padding: 8px 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .stat-pill .num {
+    font-size: 18px; font-weight: 800; color: var(--text-primary);
+  }
+  .stat-pill .lbl {
+    font-size: 11px; color: var(--text-muted); letter-spacing: 0.04em;
+  }
+  .stat-pill.ok   { border-color: rgba(34,197,94,0.3);  background: rgba(34,197,94,0.06); }
+  .stat-pill.ok .num   { color: var(--ok); }
+  .stat-pill.err  { border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.06); }
+  .stat-pill.err .num  { color: var(--err); }
+  .stat-pill.total { border-color: rgba(201,168,76,0.25); }
+  .stat-pill.total .num { color: var(--accent); }
+
+  /* ── RESULTS TABLE ── */
+  #results-section { display: none; }
+
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--glass-border);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead tr {
+    background: rgba(39,86,168,0.15);
+    border-bottom: 1px solid var(--glass-border);
+  }
+  thead th {
+    padding: 12px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.15s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.03); }
+  tbody td {
+    padding: 11px 14px;
+    vertical-align: top;
+    color: var(--text-secondary);
+  }
+  tbody td.mono { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 12px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .badge.ok  { background: rgba(34,197,94,0.12);  color: var(--ok);  border: 1px solid rgba(34,197,94,0.25); }
+  .badge.err { background: rgba(248,113,113,0.12); color: var(--err); border: 1px solid rgba(248,113,113,0.25); }
+
+  .erros-list { display: flex; flex-direction: column; gap: 4px; }
+  .erro-item {
+    font-size: 11px; color: var(--err);
+    background: rgba(248,113,113,0.08);
+    border: 1px solid rgba(248,113,113,0.15);
+    border-radius: 5px;
+    padding: 3px 8px;
+  }
+
+  /* ── EXPORT BTN ── */
+  .btn-export {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 22px;
+    background: rgba(201,168,76,0.12);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: var(--radius-sm);
+    color: var(--accent);
+    font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+    text-decoration: none;
+  }
+  .btn-export:hover { background: rgba(201,168,76,0.2); transform: translateY(-1px); }
+
+  .results-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--navy-700); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#c9a84c">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="9" y1="13" x2="15" y2="13"/>
+      <line x1="9" y1="17" x2="13" y2="17"/>
+    </svg>
+  </div>
+  <div class="header-text">
+    <h1>Validador de Invoices — SAAB</h1>
+    <p>Comércio Exterior · Automação de Conferência</p>
+  </div>
+  <span class="header-badge">PDF + EXCEL</span>
+</header>
+
+<main>
+
+  <!-- UPLOAD SECTION -->
+  <div class="card">
+    <div class="section-label">📂 Arquivos de Entrada</div>
+    <div class="upload-grid">
+
+      <!-- PDFs -->
+      <div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;font-weight:600;">
+          Invoices PDF <span style="color:var(--text-muted);font-weight:400">(uma ou mais)</span>
+        </p>
+        <div class="drop-zone" id="drop-pdf" onclick="document.getElementById('input-pdf').click()">
+          <input type="file" id="input-pdf" accept=".pdf" multiple onchange="handlePdfFiles(this.files)">
+          <div class="drop-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#e8c97a" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <div class="drop-label">Arraste os PDFs aqui</div>
+          <div class="drop-hint">Invoices SAAB · formato Customs Invoice</div>
+          <div class="file-tags" id="pdf-tags"></div>
+        </div>
+      </div>
+
+      <!-- Excel -->
+      <div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;font-weight:600;">
+          Arquivo Base Excel <span style="color:var(--text-muted);font-weight:400">(QuickReport)</span>
+        </p>
+        <div class="drop-zone" id="drop-xl" onclick="document.getElementById('input-xl').click()">
+          <input type="file" id="input-xl" accept=".xlsx,.xls,.csv" onchange="handleExcelFile(this.files[0])">
+          <div class="drop-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="3" y1="15" x2="21" y2="15"/>
+              <line x1="9" y1="3" x2="9" y2="21"/>
+            </svg>
+          </div>
+          <div class="drop-label">Arraste o Excel aqui</div>
+          <div class="drop-hint">.xlsx · colunas Shipment ID, Part No, etc.</div>
+          <div id="xl-filename" class="drop-filename" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-run" id="btn-run" disabled onclick="executar()">
+      ⚡ PROCESSAR E VALIDAR
+    </button>
+
+    <div class="log-panel" id="log-panel">
+      <span style="color:var(--text-muted)">» Aguardando arquivos…</span>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results-section">
+    <div class="results-header">
+      <div>
+        <div class="section-label" style="margin-bottom:0">📊 Resultado da Análise</div>
+      </div>
+      <button class="btn-export" onclick="exportarExcel()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Exportar Excel
+      </button>
+    </div>
+
+    <div class="stats-bar" id="stats-bar"></div>
+
+    <div class="table-wrap">
+      <table id="results-table">
+        <thead>
+          <tr>
+            <th>Shipment ID</th>
+            <th>Part No</th>
+            <th>Qtde<br><span style="font-weight:400;text-transform:none;letter-spacing:0">Excel / PDF</span></th>
+            <th>Fabricante<br><span style="font-weight:400;text-transform:none;letter-spacing:0">Excel / PDF</span></th>
+            <th>País<br><span style="font-weight:400;text-transform:none;letter-spacing:0">Excel / PDF</span></th>
+            <th>Valor Total<br><span style="font-weight:400;text-transform:none;letter-spacing:0">Excel / PDF</span></th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+let pdfFiles = [];         // File objects
+let excelFile = null;
+let resultadosFinal = [];  // para exportar
+
+// ─────────────────────────────────────────────
+// UI HELPERS
+// ─────────────────────────────────────────────
+function log(msg, tipo = 'line') {
+  const el = document.getElementById('log-panel');
+  const span = document.createElement('div');
+  span.className = `log-${tipo}`;
+  span.textContent = `» ${msg}`;
+  if (el.querySelector('span[style]')) el.innerHTML = '';
+  el.appendChild(span);
+  el.scrollTop = el.scrollHeight;
+}
+
+function checkReady() {
+  const ok = pdfFiles.length > 0 && excelFile !== null;
+  document.getElementById('btn-run').disabled = !ok;
+}
+
+// ── Drag & drop visual ──
+['drop-pdf','drop-xl'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('drag-over');
+    if (id === 'drop-pdf') handlePdfFiles(e.dataTransfer.files);
+    else handleExcelFile(e.dataTransfer.files[0]);
+  });
+});
+
+function handlePdfFiles(files) {
+  for (const f of files) {
+    if (f.type === 'application/pdf' && !pdfFiles.find(x => x.name === f.name)) {
+      pdfFiles.push(f);
+    }
+  }
+  renderPdfTags();
+  checkReady();
+}
+
+function renderPdfTags() {
+  const container = document.getElementById('pdf-tags');
+  container.innerHTML = '';
+  const zone = document.getElementById('drop-pdf');
+  if (pdfFiles.length === 0) {
+    zone.classList.remove('has-file');
+    return;
+  }
+  zone.classList.add('has-file');
+  pdfFiles.forEach((f, i) => {
+    const tag = document.createElement('div');
+    tag.className = 'file-tag';
+    tag.innerHTML = `📄 ${f.name} <button class="remove-tag" onclick="removePdf(${i},event)">×</button>`;
+    container.appendChild(tag);
+  });
+}
+
+function removePdf(i, e) {
+  e.stopPropagation();
+  pdfFiles.splice(i, 1);
+  renderPdfTags();
+  checkReady();
+}
+
+function handleExcelFile(file) {
+  if (!file) return;
+  excelFile = file;
+  const el = document.getElementById('xl-filename');
+  el.textContent = '✓ ' + file.name;
+  el.style.display = 'block';
+  document.getElementById('drop-xl').classList.add('has-file');
+  checkReady();
+}
+
+// ─────────────────────────────────────────────
+// PDF PARSER — usa coordenadas posicionais do PDF.js
+// ─────────────────────────────────────────────
+async function extrairItensPdf(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  // Coleta todos os tokens de todas as páginas com suas coordenadas reais
+  // token = { str, x, y, w }   (y é invertido: maior = mais acima na página)
+  let allTokens = [];
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page  = await pdf.getPage(p);
+    const vp    = page.getViewport({ scale: 1 });
+    const content = await page.getTextContent();
+
+    for (const item of content.items) {
+      const str = item.str.trim();
+      if (!str) continue;
+      const x = item.transform[4];
+      const y = vp.height - item.transform[5]; // converte para y "de cima pra baixo"
+      const w = item.width;
+      allTokens.push({ str, x, y, w, page: p });
+    }
+  }
+
+  // Agrupa tokens em "linhas lógicas" por proximidade vertical (±3pt)
+  allTokens.sort((a, b) => a.y - b.y || a.x - b.x);
+
+  const YSNAP = 3; // tolerância vertical em pontos
+  const linhasLogicas = []; // cada linha = array de tokens ordenados por X
+  for (const tok of allTokens) {
+    const ultima = linhasLogicas[linhasLogicas.length - 1];
+    if (ultima && Math.abs(tok.y - ultima[0].y) <= YSNAP) {
+      ultima.push(tok);
+    } else {
+      linhasLogicas.push([tok]);
+    }
+  }
+  // Garante ordenação X dentro de cada linha
+  linhasLogicas.forEach(l => l.sort((a, b) => a.x - b.x));
+
+  // Helper: texto da linha concatenado
+  const linhaStr = l => l.map(t => t.str).join(' ');
+
+  // ── CABEÇALHO ──
+  let invoiceNo = '', packingNo = '';
+  for (const linha of linhasLogicas) {
+    const s = linhaStr(linha);
+    if (!invoiceNo) { const m = s.match(/Shipment Invoice No[:\s]+(\d+)/i); if (m) invoiceNo = m[1]; }
+    if (!packingNo) { const m = s.match(/Packing List No[:\s]+(\d+)/i);    if (m) packingNo = m[1]; }
+    if (invoiceNo && packingNo) break;
+  }
+  // Fallback: cabeçalho pode estar em linhas adjacentes sem o label junto
+  if (!invoiceNo) {
+    for (let i = 0; i < linhasLogicas.length; i++) {
+      if (/Shipment Invoice No/i.test(linhaStr(linhasLogicas[i]))) {
+        const proxStr = linhaStr(linhasLogicas[i + 1] || []);
+        const m = proxStr.match(/(\d{6,})/);
+        if (m) invoiceNo = m[1];
+      }
+      if (/Packing List No/i.test(linhaStr(linhasLogicas[i]))) {
+        const proxStr = linhaStr(linhasLogicas[i + 1] || []);
+        const m = proxStr.match(/(\d{6,})/);
+        if (m) packingNo = m[1];
+      }
+    }
+  }
+
+  // ── DETECTAR COLUNAS DA TABELA ──
+  // Localiza a linha do cabeçalho da tabela (contém "Qty:" e "Total:")
+  // para inferir as posições X das colunas numéricas
+  let xQty = null, xTotal = null;
+  for (const linha of linhasLogicas) {
+    const hasQty   = linha.some(t => /^Qty[:\s]*$/i.test(t.str));
+    const hasTotal = linha.some(t => /^Total[:\s]*$/i.test(t.str));
+    if (hasQty && hasTotal) {
+      xQty   = linha.find(t => /^Qty/i.test(t.str))?.x;
+      xTotal = linha.find(t => /^Total/i.test(t.str))?.x;
+      break;
+    }
+  }
+  // Fallback se cabeçalho estiver em linhas separadas
+  if (!xQty || !xTotal) {
+    for (const linha of linhasLogicas) {
+      for (const tok of linha) {
+        if (/^Qty[:\s]*$/i.test(tok.str) && !xQty)   xQty   = tok.x;
+        if (/^Total[:\s]*$/i.test(tok.str) && !xTotal) xTotal = tok.x;
+      }
+    }
+  }
+
+  const COL_TOLERANCE = 28; // largura de coluna tolerada em pontos
+
+  const limparNum = v => {
+    const s = String(v).replace(/,/g, '').trim();
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
+
+  // ── EXTRAÇÃO DE ITENS ──
+  const itens = [];
+  let currentPart    = null;
+  let currentQty     = null;
+  let currentTotal   = null;
+  let currentMfg     = null;
+  let currentCountry = null;
+  let expectMfgName  = false; // flag: próximo token de texto não-label é o nome do fabricante
+
+  const salvarItem = () => {
+    if (currentPart) {
+      itens.push({
+        partNo:       currentPart,
+        qty:          currentQty,
+        total:        currentTotal,
+        manufacturer: currentMfg,
+        country:      currentCountry,
+      });
+    }
+    currentPart = currentQty = currentTotal = currentMfg = currentCountry = null;
+    expectMfgName = false;
+  };
+
+  for (let i = 0; i < linhasLogicas.length; i++) {
+    const linha  = linhasLogicas[i];
+    const s      = linhaStr(linha);
+
+    // ── Linha de item: contém "Description:" com Part No antes
+    if (/Description:/i.test(s)) {
+      salvarItem();
+      expectMfgName = false;
+
+      // Part No está no token imediatamente antes de "Description:"
+      const descIdx = linha.findIndex(t => /Description:/i.test(t.str));
+      if (descIdx > 0) {
+        // Procura o último token antes de "Description:" que parece um Part No
+        for (let k = descIdx - 1; k >= 0; k--) {
+          if (/^[A-Z0-9][\w\-]{3,}$/i.test(linha[k].str)) {
+            currentPart = linha[k].str.trim();
+            break;
+          }
+        }
+      }
+
+      // Qty e Total: usa posição X das colunas detectadas
+      if (xQty !== null && xTotal !== null) {
+        for (const tok of linha) {
+          const isNum = /^\d{1,3}(?:,\d{3})*(?:\.\d+)?$/.test(tok.str);
+          if (!isNum) continue;
+          if (Math.abs(tok.x - xQty)   <= COL_TOLERANCE) currentQty   = limparNum(tok.str);
+          if (Math.abs(tok.x - xTotal) <= COL_TOLERANCE) currentTotal = limparNum(tok.str);
+        }
+        // Se não encontrou na linha do Description, procura nas próximas 2 linhas
+        // (PDF às vezes quebra a linha da tabela)
+        if (currentQty === null || currentTotal === null) {
+          for (let j = i + 1; j <= i + 3 && j < linhasLogicas.length; j++) {
+            const prox = linhasLogicas[j];
+            const proxS = linhaStr(prox);
+            // Para se chegar em outro campo de detalhe do item
+            if (/Manufacturer:|HS Code:|Origin:|Cert No:/i.test(proxS)) break;
+            for (const tok of prox) {
+              const isNum = /^\d{1,3}(?:,\d{3})*(?:\.\d+)?$/.test(tok.str);
+              if (!isNum) continue;
+              if (currentQty   === null && Math.abs(tok.x - xQty)   <= COL_TOLERANCE) currentQty   = limparNum(tok.str);
+              if (currentTotal === null && Math.abs(tok.x - xTotal) <= COL_TOLERANCE) currentTotal = limparNum(tok.str);
+            }
+            if (currentQty !== null && currentTotal !== null) break;
+          }
+        }
+      } else {
+        // Fallback sem coordenadas: tenta pegar números no final da linha
+        const nums = linha
+          .filter(t => /^\d{1,3}(?:,\d{3})*(?:\.\d+)?$/.test(t.str))
+          .map(t => limparNum(t.str));
+        if (nums.length >= 2) {
+          currentQty   = nums[0];
+          currentTotal = nums[nums.length - 1];
+        }
+      }
+      if (currentQty   === null) currentQty   = 0;
+      if (currentTotal === null) currentTotal = 0;
+    }
+
+    // ── Manufacturer:
+    // O label "Manufacturer:" pode estar na mesma linha que o nome, ou o nome
+    // pode vir na linha seguinte (token isolado após o label)
+    else if (/Manufacturer:/i.test(s) && !/Part No/i.test(s)) {
+      // Tenta capturar na mesma linha (depois do label)
+      const mIdx = linha.findIndex(t => /Manufacturer:/i.test(t.str));
+      const afterLabel = linha.slice(mIdx + 1).map(t => t.str).join(' ').trim();
+
+      if (afterLabel.length > 0) {
+        // Descarta tokens que são apenas números/hifens (endereço postal)
+        currentMfg = afterLabel.split(/\s{3,}/)[0].trim();
+        expectMfgName = false;
+      } else {
+        // Nome está na próxima linha — seta flag para capturar
+        expectMfgName = true;
+      }
+    }
+
+    // ── Captura nome do fabricante na linha seguinte ao label
+    else if (expectMfgName && currentPart) {
+      // Ignora linhas de endereço (só números/CEP) e linhas de outros campos
+      const isOutroLabel = /HS Code:|Origin:|Cert No:|Export|Lot\/Batch|Manufacturer's/i.test(s);
+      const isEnderecoSo = /^\d[\d\s\-]+$/.test(s.trim()); // linha só com CEP/número
+      if (!isOutroLabel && !isEnderecoSo && s.trim().length > 0) {
+        currentMfg    = s.trim();
+        expectMfgName = false;
+      }
+    }
+
+    // ── Country of Origin — regra blindada por "Cert No:"
+    if (/Cert No:/i.test(s)) {
+      const certIdx = linha.findIndex(t => /Cert No:/i.test(t.str));
+      // País = tokens antes do "Cert No:" que sejam 2 letras maiúsculas
+      for (let k = certIdx - 1; k >= 0; k--) {
+        if (/^[A-Z]{2}$/.test(linha[k].str)) {
+          currentCountry = linha[k].str.toUpperCase();
+          break;
+        }
+      }
+      // Fallback regex no texto
+      if (!currentCountry) {
+        const antes = s.split(/Cert No:/i)[0];
+        const m = antes.match(/\b([A-Z]{2})\s*$/);
+        if (m) currentCountry = m[1];
+      }
+    } else if (/Origin:/i.test(s) && !currentCountry) {
+      // "Country of Origin:" com valor na mesma linha
+      const originIdx = linha.findIndex(t => /Origin:/i.test(t.str));
+      const depois = linha.slice(originIdx + 1);
+      for (const tok of depois) {
+        if (/^[A-Z]{2}$/.test(tok.str)) { currentCountry = tok.str; break; }
+      }
+      if (!currentCountry) {
+        const m = s.match(/Origin:\s*([A-Z]{2})\b/i);
+        if (m) currentCountry = m[1].toUpperCase();
+      }
+    }
+  }
+
+  // Salva último item
+  salvarItem();
+
+  return { invoiceNo, packingNo, itens };
+}
+
+// ─────────────────────────────────────────────
+// EXCEL PARSER
+// ─────────────────────────────────────────────
+async function lerExcel(file) {
+  const buffer = await file.arrayBuffer();
+  const wb = XLSX.read(buffer, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  const limparNum = v => {
+    const s = String(v).replace(/,/g, '').trim();
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
+
+  return rows
+    .filter(r => r['Part No'] && String(r['Part No']).trim() !== '' && String(r['Part No']).toLowerCase() !== 'nan')
+    .map(r => ({
+      shipmentId:    String(r['Shipment ID'] || '').split('.')[0].trim(),
+      partNo:        String(r['Part No'] || '').trim(),
+      qty:           limparNum(r['Picked Qty (pcs)']),
+      manufacturer:  String(r['Manufacturer Name'] || '').trim(),
+      country:       String(r['Country Of Origin'] || '').trim().toUpperCase(),
+      price:         limparNum(r['Sales Price On Row']),
+      // raw para exportar
+      _rawQty:       r['Picked Qty (pcs)'],
+      _rawPrice:     r['Sales Price On Row'],
+    }));
+}
+
+// ─────────────────────────────────────────────
+// COMPARAÇÃO
+// ─────────────────────────────────────────────
+function normalizar(s) {
+  return String(s).replace(/\s+/g, '').toUpperCase();
+}
+
+function comparar(excelRows, pdfMap) {
+  return excelRows.map(row => {
+    const erros = [];
+    const shipId = row.shipmentId;
+
+    if (!pdfMap[shipId]) {
+      erros.push(`PDF não encontrado para Shipment ID ${shipId}`);
+      return { ...row, erros, pdfQty: '-', pdfMfg: '-', pdfCountry: '-', pdfPrice: '-' };
+    }
+
+    const itensPdf = pdfMap[shipId];
+    const item = itensPdf.find(i => i.partNo === row.partNo);
+
+    if (!item) {
+      erros.push(`Part No ${row.partNo} não encontrado no PDF`);
+      return { ...row, erros, pdfQty: '-', pdfMfg: '-', pdfCountry: '-', pdfPrice: '-' };
+    }
+
+    // Qtde
+    if (row.qty !== item.qty) {
+      erros.push(`Qtde divergente (Excel: ${row.qty} | PDF: ${item.qty})`);
+    }
+
+    // Manufacturer
+    const mfgXl  = normalizar(row.manufacturer);
+    const mfgPdf = normalizar(item.manufacturer || '');
+    if (mfgPdf && !mfgPdf.includes(mfgXl) && !mfgXl.includes(mfgPdf)) {
+      erros.push(`Fabricante divergente (Excel: ${row.manufacturer} | PDF: ${item.manufacturer})`);
+    }
+
+    // País
+    const countryPdf = String(item.country || '').trim().toUpperCase();
+    if (!countryPdf || countryPdf === 'UNDEFINED' || countryPdf === 'NULL') {
+      erros.push(`País não identificado no PDF (Excel: ${row.country})`);
+    } else if (countryPdf !== row.country) {
+      erros.push(`País divergente (Excel: ${row.country} | PDF: ${countryPdf})`);
+    }
+
+    // Valor Total
+    const diff = Math.abs(row.price - (item.total || 0));
+    if (diff > 0.01) {
+      erros.push(`Valor divergente (Excel: ${fmtNum(row.price)} | PDF: ${fmtNum(item.total)})`);
+    }
+
+    return {
+      ...row,
+      erros,
+      pdfQty:     item.qty,
+      pdfMfg:     item.manufacturer,
+      pdfCountry: countryPdf,
+      pdfPrice:   item.total,
+    };
+  });
+}
+
+// ─────────────────────────────────────────────
+// MAIN — EXECUTAR
+// ─────────────────────────────────────────────
+async function executar() {
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  btn.textContent = '⏳ Processando…';
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('log-panel').innerHTML = '';
+
+  try {
+    // 1. Ler Excel
+    log(`Lendo Excel: ${excelFile.name}`, 'info');
+    const excelRows = await lerExcel(excelFile);
+    log(`${excelRows.length} linha(s) carregadas do Excel`, 'ok');
+
+    // 2. Ler todos os PDFs
+    const pdfMap = {}; // shipmentId → itens[]
+    for (const file of pdfFiles) {
+      log(`Processando PDF: ${file.name}`, 'info');
+      const { invoiceNo, packingNo, itens } = await extrairItensPdf(file);
+      log(`  → Invoice ${invoiceNo} · ${itens.length} item(s) extraído(s)`, 'ok');
+
+      // Mapeia pelo Shipment ID (Invoice No do PDF)
+      const chave = invoiceNo || file.name.match(/(\d+)/)?.[1] || file.name;
+      if (!pdfMap[chave]) pdfMap[chave] = [];
+      pdfMap[chave].push(...itens);
+
+      // Também mapeia sub-shipments que possam aparecer no Excel (Packing List Nos do QuickReport)
+      // O QuickReport pode ter 3013119, 3013121 que são IDs de pacotes individuais
+      // Para cobertura, expõe o packingNo como chave alternativa
+      if (packingNo && packingNo !== chave && !pdfMap[packingNo]) {
+        pdfMap[packingNo] = pdfMap[chave];
+      }
+    }
+
+    // 3. Comparar
+    log('Comparando dados…', 'info');
+    resultadosFinal = comparar(excelRows, pdfMap);
+
+    const totalOk  = resultadosFinal.filter(r => r.erros.length === 0).length;
+    const totalErr = resultadosFinal.filter(r => r.erros.length  > 0).length;
+    log(`Análise concluída — ${totalOk} OK · ${totalErr} com divergência(s)`, totalErr > 0 ? 'err' : 'ok');
+
+    renderResultados(resultadosFinal);
+
+  } catch (e) {
+    log(`Erro: ${e.message}`, 'err');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚡ PROCESSAR E VALIDAR';
+  }
+}
+
+// ─────────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────────
+function fmtNum(v) {
+  const n = parseFloat(v);
+  if (isNaN(n)) return String(v);
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderResultados(rows) {
+  const totalOk  = rows.filter(r => r.erros.length === 0).length;
+  const totalErr = rows.filter(r => r.erros.length  > 0).length;
+
+  // Stats
+  document.getElementById('stats-bar').innerHTML = `
+    <div class="stat-pill total"><span class="num">${rows.length}</span><span class="lbl">Total</span></div>
+    <div class="stat-pill ok"><span class="num">${totalOk}</span><span class="lbl">Conferidos</span></div>
+    <div class="stat-pill err"><span class="num">${totalErr}</span><span class="lbl">Divergências</span></div>
+  `;
+
+  // Table
+  const tbody = document.getElementById('results-body');
+  tbody.innerHTML = '';
+
+  rows.forEach(r => {
+    const ok = r.erros.length === 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono">${r.shipmentId}</td>
+      <td class="mono">${r.partNo}</td>
+      <td>
+        <span>${r.qty}</span>
+        <span style="color:var(--text-muted)"> / </span>
+        <span style="color:${r.pdfQty !== '-' && r.pdfQty !== r.qty ? 'var(--err)' : 'var(--text-secondary)'}">${r.pdfQty !== undefined ? r.pdfQty : '-'}</span>
+      </td>
+      <td style="font-size:12px">
+        <div>${r.manufacturer}</div>
+        <div style="color:var(--text-muted);font-size:11px">${r.pdfMfg || '-'}</div>
+      </td>
+      <td>
+        <span>${r.country}</span>
+        <span style="color:var(--text-muted)"> / </span>
+        <span style="color:${r.pdfCountry && r.pdfCountry !== r.country ? 'var(--err)' : 'var(--text-secondary)'}">${r.pdfCountry || '-'}</span>
+      </td>
+      <td class="mono" style="font-size:12px">
+        <div>${fmtNum(r.price)}</div>
+        <div style="color:var(--text-muted);font-size:11px">${r.pdfPrice !== undefined && r.pdfPrice !== '-' ? fmtNum(r.pdfPrice) : '-'}</div>
+      </td>
+      <td>
+        ${ok
+          ? `<span class="badge ok">✓ Conferido</span>`
+          : `<div class="erros-list">${r.erros.map(e => `<div class="erro-item">⚠ ${e}</div>`).join('')}</div>`
+        }
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ─────────────────────────────────────────────
+// EXPORT EXCEL
+// ─────────────────────────────────────────────
+function exportarExcel() {
+  if (!resultadosFinal.length) return;
+
+  const data = resultadosFinal.map(r => ({
+    'Shipment ID':          r.shipmentId,
+    'Part No':              r.partNo,
+    'Qtde Excel':           r.qty,
+    'Qtde PDF':             r.pdfQty,
+    'Fabricante Excel':     r.manufacturer,
+    'Fabricante PDF':       r.pdfMfg,
+    'País Excel':           r.country,
+    'País PDF':             r.pdfCountry,
+    'Valor Excel':          r.price,
+    'Valor PDF':            r.pdfPrice,
+    'Análise Automação':    r.erros.length === 0
+                              ? 'Todos os pontos analisados estão de acordo'
+                              : 'ERRO: ' + r.erros.join(' | '),
+  }));
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(data);
+
+  // Larguras de coluna
+  ws['!cols'] = [
+    { wch: 14 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
+    { wch: 22 }, { wch: 22 }, { wch: 12 }, { wch: 12 },
+    { wch: 14 }, { wch: 14 }, { wch: 55 },
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Análise SAAB');
+
+  const now = new Date();
+  const ts = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+  XLSX.writeFile(wb, `Analise_SAAB_${ts}.xlsx`);
+}
+</script>
+</body>
+</html>
